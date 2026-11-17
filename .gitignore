@@ -1,0 +1,25 @@
+# Archivos de variables de entorno reales (NUNCA subir contraseñas)
+.env
+.env.*
+!.env.example
+env/
+
+# Datos persistentes y respaldos de PostgreSQL (solo se sube postgres-prod/Dockerfile)
+postgres-prod/data/
+postgres-prod/backups/
+data/
+
+# Llaves privadas SSL en Nginx (si existen)
+nginx/certificates/*.key
+nginx/certificates/*.pem
+
+# Carpetas locales de otros repositorios y archivos de desarrollo
+cinema/
+frontend-cine-dip/
+postgreSQL/
+compose.dev.yaml
+
+# Archivos del sistema y editores
+.vscode/
+.idea/
+.DS_Store

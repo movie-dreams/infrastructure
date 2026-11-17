@@ -1,0 +1,14 @@
+FROM nginx:1.30-alpine
+
+WORKDIR /etc/nginx
+
+COPY ./nginx.conf ./nginx.conf
+
+RUN mkdir -p ./sites-enabled
+
+COPY ./sites-available ./sites-available
+
+EXPOSE 80
+EXPOSE 443
+
+CMD ["nginx", "-g", "daemon off;"]
