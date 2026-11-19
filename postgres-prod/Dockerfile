@@ -2,4 +2,5 @@ ARG POSTGRES_VERSION=17
 
 FROM postgres:${POSTGRES_VERSION}-alpine
 
-CMD ["postgres","-c","log_statement=all","-c","log_min_duration_statement=0"]
+# Logging razonable para VPS (evitar log_statement=all en producción)
+CMD ["postgres", "-c", "log_min_duration_statement=500"]

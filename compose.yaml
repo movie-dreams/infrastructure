@@ -1,3 +1,13 @@
+# Producción — VPS (Oracle Cloud u otro)
+# Requisitos en el servidor:
+#   1. cp .env.example .env                 → editar secretos y tags
+#   2. cp env/api.env.example env/api.env   → editar JWT_SECRET y CORS
+#   3. docker compose pull && docker compose up -d
+#
+# Arquitectura: nginx (80) → frontend:8080 | api:3000 → postgres:5432
+# Nota Oracle: si el shape es Ampere (ARM64), las imágenes CI deben ser
+# multi-arch (linux/amd64,linux/arm64) o el VPS debe ser x86_64.
+
 services:
   postgres-cine-prod:
     build:
@@ -10,11 +20,11 @@ services:
     volumes:
       - ./postgres-prod/data:/var/lib/postgresql/data
     environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -22,55 +32,65 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "1"
-          memory: 1G
+          cpus: "0.50"
+          memory: 768M
         reservations:
-          cpus: "0.5"
-          memory: 512M
+          cpus: "0.10"
+          memory: 256M
     networks:
-      - db-network-cine-prod
+      - cine-net
 
   api-cine-prod:
     image: ${DOCKER_USERNAME}/api-cine:${API_TAG}
     container_name: api-cine-prod
     env_file:
       - ./env/api.env
+    environment:
+      # Fuente única de verdad: .env raíz (evita desync con postgres)
+      DB_HOST: postgres-cine-prod
+      DB_PORT: 5432
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB}
+      NODE_ENV: production
     restart: unless-stopped
     volumes:
       - ./data/estatico:/app/estatico
+    expose:
+      - "3000"
     healthcheck:
       test:
         [
           "CMD",
           "node",
           "-e",
-          "fetch('http://localhost:3000/documentacion-json').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+          "fetch('http://127.0.0.1:3000/documentacion-json').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
         ]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 40s
+      start_period: 60s
     deploy:
       resources:
         limits:
-          cpus: "1"
-          memory: 1G
+          cpus: "0.75"
+          memory: 768M
         reservations:
-          cpus: "0.5"
-          memory: 512M
+          cpus: "0.10"
+          memory: 256M
     depends_on:
       postgres-cine-prod:
         condition: service_healthy
     networks:
-      - db-network-cine-prod
+      - cine-net
 
   frontend-cine-prod:
     image: ${DOCKER_USERNAME}/frontend-cine:${FRONTEND_TAG}
     container_name: frontend-cine-prod
     expose:
-      - "80"
+      - "8080"
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:80/ || exit 1"]
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/ || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -78,14 +98,14 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "1"
-          memory: 1G
+          cpus: "0.25"
+          memory: 128M
         reservations:
-          cpus: "0.5"
-          memory: 512M
+          cpus: "0.05"
+          memory: 32M
     restart: unless-stopped
     networks:
-      - db-network-cine-prod
+      - cine-net
 
   nginx-cine-prod:
     build:
@@ -101,18 +121,24 @@ services:
         condition: service_healthy
       frontend-cine-prod:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:80/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: 256M
+          cpus: "0.25"
+          memory: 128M
         reservations:
-          cpus: "0.1"
-          memory: 64M
+          cpus: "0.05"
+          memory: 32M
     networks:
-      - db-network-cine-prod
+      - cine-net
 
 networks:
-  db-network-cine-prod:
+  cine-net:
     driver: bridge
-    name: db-network-cine-prod
+    name: cine-net

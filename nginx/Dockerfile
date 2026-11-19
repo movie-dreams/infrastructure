@@ -7,9 +7,9 @@ COPY ./nginx.conf ./nginx.conf
 RUN mkdir -p ./sites-enabled ./sites-available \
     && rm -f ./conf.d/default.conf
 
+# Vhosts de producción (sites-available en imagen; se enlazan a sites-enabled)
 COPY ./sites-prod/ ./sites-available/
 
-# Enable all production vhosts (sites-enabled must not stay empty).
 RUN ln -sf /etc/nginx/sites-available/client-cine-upea.bo.conf \
         /etc/nginx/sites-enabled/client-cine-upea.bo.conf
 
